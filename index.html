@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -27,7 +29,7 @@
                         <option value="6">NAB</option>
                     </select>
                 </div>
-                
+
                 <div class="control-group">
                     <label for="day">Day</label>
                     <select id="day">
@@ -50,12 +52,27 @@
                 <button id="findBtn">Find Available Rooms</button>
             </div>
 
+            <h2 class="section-title">Available Rooms</h2>
             <div id="results" class="results-grid">
                 <!-- Results go here -->
+            </div>
+
+            <!-- Search Section -->
+            <div class="search-section">
+                <h2>🔍 Search Course / Room</h2>
+                <p class="search-subtitle">Look up any room, course number, or course name to see its schedule</p>
+                <div class="search-controls">
+                    <input type="text" id="searchInput" placeholder="e.g. 1231, CE F244, HIGHWAY...">
+                    <button id="searchBtn">Search</button>
+                </div>
+                <div id="searchResults" class="search-results">
+                    <!-- Search results go here -->
+                </div>
             </div>
         </main>
     </div>
 
     <script src="script.js"></script>
 </body>
+
 </html>

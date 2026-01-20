@@ -1,4 +1,3 @@
-
 import pdfplumber
 import json
 import re
@@ -190,45 +189,73 @@ def parse_days_hours_string(dh_string):
 def run_extraction():
     pdf_path = "Timetable.pdf"
     
-    # Init room usage with empty slots
-    # But we don't know all rooms yet. We build dynamically.
     room_usage = {}
+    courses = []  # List of course objects
     
     valid_room_pattern = re.compile(r'^[12356]\d{3}$')
     
+    # Track current course info for forward-filling
+    current_course_no = ""
+    current_course_title = ""
+    current_instructor = ""
+    
     with pdfplumber.open(pdf_path) as pdf:
-        count = 0
+        slot_count = 0
+        course_count = 0
+        
         for i, page in enumerate(pdf.pages):
+            if i % 20 == 0:
+                print(f"Scanning page {i+1}/{len(pdf.pages)}...")
+            
             tables = page.extract_tables()
             for table in tables:
-                if not table or len(table[0]) < 9:
+                if not table or len(table[0]) < 10:
                     continue
                 
                 for row in table:
-                    # Safety check
-                    if len(row) < 10: 
-                         # Some rows might be shorter? 
-                         # Usually pdfplumber makes rectangular tables, filling None
-                         pass
-                    
-                    # Columns index might vary if there are fewer columns detected
-                    # We rely on previous inspection that index 8 is room, 9 is time.
-                    try:
-                        room_raw = row[8]
-                        time_raw = row[9]
-                    except IndexError:
+                    if len(row) < 10:
                         continue
-                        
+                    
+                    # Clean all cells
+                    cleaned = [cell.strip() if cell else "" for cell in row]
+                    
+                    # Column mapping (from PDF inspection):
+                    # 0: COM COD
+                    # 1: COURSE NO
+                    # 2: COURSE TITLE
+                    # 3: L (credit)
+                    # 4: P (credit)
+                    # 5: U (credit)
+                    # 6: SEC
+                    # 7: INSTRUCTOR
+                    # 8: ROOM
+                    # 9: DAYS & HOURS
+                    
+                    course_no = cleaned[1]
+                    course_title = cleaned[2]
+                    sec = cleaned[6]
+                    instructor = cleaned[7]
+                    room_raw = cleaned[8]
+                    time_raw = cleaned[9]
+                    
+                    # Forward-fill course number and title
+                    if course_no and not course_no.startswith("COURSE"):
+                        current_course_no = course_no
+                    if course_title and course_title not in ["COURSE TITLE", "Practical", "Tutorial"]:
+                        current_course_title = course_title
+                    if instructor and instructor not in ["INSTRUCTOR-IN-CHARGE /", "Instructor"]:
+                        current_instructor = instructor
+                    
+                    # Skip header rows
+                    if "COM" in cleaned[0] or "COURSE" in course_no:
+                        continue
+                    
                     if not room_raw or not time_raw:
                         continue
                     
-                    room_raw = room_raw.strip()
-                    time_raw = time_raw.strip()
-                    
-                    # Sometimes room has extra chars? "1231"
-                    # Just take first word
                     room_parts = room_raw.split()
-                    if not room_parts: continue
+                    if not room_parts:
+                        continue
                     room = room_parts[0]
                     
                     if not valid_room_pattern.match(room):
@@ -236,28 +263,62 @@ def run_extraction():
                     
                     pairs = parse_days_hours_string(time_raw)
                     
+                    if not pairs:
+                        continue
+                    
+                    # Add to room_usage
                     if room not in room_usage:
                         room_usage[room] = {d: [] for d in ['M', 'T', 'W', 'Th', 'F', 'S']}
                     
                     for d, h in pairs:
                         if h not in room_usage[room][d]:
                             room_usage[room][d].append(h)
-                            count += 1
+                            slot_count += 1
+                    
+                    # Build schedule dict for this entry
+                    schedule = {}
+                    for d, h in pairs:
+                        if d not in schedule:
+                            schedule[d] = []
+                        if h not in schedule[d]:
+                            schedule[d].append(h)
+                    
+                    # Sort hours in schedule
+                    for d in schedule:
+                        schedule[d] = sorted(schedule[d])
+                    
+                    # Add course entry
+                    course_entry = {
+                        "course_no": current_course_no,
+                        "course_title": current_course_title,
+                        "section": sec,
+                        "instructor": current_instructor,
+                        "room": room,
+                        "schedule": schedule,
+                        "raw_time": time_raw
+                    }
+                    courses.append(course_entry)
+                    course_count += 1
     
-    print(f"Extracted {count} slots.")
+    print(f"Extracted {slot_count} slots from {course_count} entries.")
     
-    # Sort rooms and hours
+    # Save room_availability.json
     sorted_rooms = sorted(room_usage.keys())
-    final_data = {}
+    final_room_data = {}
     for r in sorted_rooms:
-        final_data[r] = {}
+        final_room_data[r] = {}
         for d in ['M', 'T', 'W', 'Th', 'F', 'S']:
-            final_data[r][d] = sorted(room_usage[r][d])
+            final_room_data[r][d] = sorted(room_usage[r][d])
             
     with open("room_availability.json", "w") as f:
-        json.dump(final_data, f, indent=2)
-        
+        json.dump(final_room_data, f, indent=2)
     print("Saved room_availability.json")
+    
+    # Save courses.json
+    with open("courses.json", "w", encoding="utf-8") as f:
+        json.dump(courses, f, indent=2, ensure_ascii=False)
+    print(f"Saved courses.json ({len(courses)} entries)")
 
 if __name__ == "__main__":
     run_extraction()
+

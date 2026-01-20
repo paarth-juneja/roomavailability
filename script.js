@@ -99,4 +99,138 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsDiv.appendChild(card);
         });
     }
+
+    // ===== SEARCH FUNCTIONALITY =====
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const searchResultsDiv = document.getElementById('searchResults');
+
+    let coursesData = [];
+
+    // Load courses data
+    fetch('courses.json')
+        .then(response => response.json())
+        .then(data => {
+            coursesData = data;
+        })
+        .catch(err => {
+            console.error('Error loading courses:', err);
+        });
+
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performSearch();
+    });
+
+    function performSearch() {
+        const query = searchInput.value.trim().toLowerCase();
+        if (!query) {
+            searchResultsDiv.innerHTML = '<p>Please enter a search term.</p>';
+            return;
+        }
+
+        // Search by room number, course number, or course title
+        const matches = coursesData.filter(course => {
+            return course.room.toLowerCase().includes(query) ||
+                course.course_no.toLowerCase().includes(query) ||
+                course.course_title.toLowerCase().includes(query);
+        });
+
+        if (matches.length === 0) {
+            searchResultsDiv.innerHTML = '<p>No matching courses found.</p>';
+            return;
+        }
+
+        // Group by course_no + section to show unique courses
+        const grouped = {};
+        matches.forEach(m => {
+            const key = `${m.course_no}-${m.section}`;
+            if (!grouped[key]) {
+                grouped[key] = {
+                    course_no: m.course_no,
+                    course_title: m.course_title,
+                    instructor: m.instructor,
+                    section: m.section,
+                    entries: []
+                };
+            }
+            grouped[key].entries.push({
+                room: m.room,
+                schedule: m.schedule,
+                raw_time: m.raw_time
+            });
+        });
+
+        searchResultsDiv.innerHTML = '';
+
+        const dayNames = { M: 'Monday', T: 'Tuesday', W: 'Wednesday', Th: 'Thursday', F: 'Friday', S: 'Saturday' };
+
+        // Create grid container for compact boxes
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'search-results-grid';
+
+        Object.values(grouped).forEach(course => {
+            // Get first room from entries
+            const firstRoom = course.entries[0]?.room || 'N/A';
+
+            // Create compact box
+            const box = document.createElement('div');
+            box.className = 'search-result-box';
+            box.innerHTML = `
+                <div class="box-room">${firstRoom}</div>
+                <div class="box-course">${course.course_no}</div>
+            `;
+
+            // Create expandable details panel
+            const detailsPanel = document.createElement('div');
+            detailsPanel.className = 'details-panel';
+            detailsPanel.style.display = 'none';
+
+            // Build schedule table
+            let scheduleHtml = '<table class="schedule-table"><thead><tr><th>Room</th><th>Day</th><th>Hours</th></tr></thead><tbody>';
+            course.entries.forEach(entry => {
+                for (const [day, hours] of Object.entries(entry.schedule)) {
+                    const hoursFormatted = hours.map(h => {
+                        const start = 7 + h;
+                        const end = start + 1;
+                        return `${formatHour(start)}-${formatHour(end)}`;
+                    }).join(', ');
+                    scheduleHtml += `<tr><td>${entry.room}</td><td>${dayNames[day] || day}</td><td>${hoursFormatted}</td></tr>`;
+                }
+            });
+            scheduleHtml += '</tbody></table>';
+
+            detailsPanel.innerHTML = `
+                <h3>${course.course_no} - ${course.course_title}</h3>
+                <div class="course-info">
+                    <span class="label">Section:</span><span>${course.section || 'N/A'}</span>
+                    <span class="label">Instructor:</span><span>${course.instructor || 'N/A'}</span>
+                </div>
+                ${scheduleHtml}
+                <button class="close-btn">Close</button>
+            `;
+
+            // Click to expand
+            box.addEventListener('click', () => {
+                // Close any other open panels
+                document.querySelectorAll('.details-panel').forEach(p => p.style.display = 'none');
+                document.querySelectorAll('.search-result-box').forEach(b => b.classList.remove('active'));
+
+                detailsPanel.style.display = 'block';
+                box.classList.add('active');
+            });
+
+            // Close button
+            detailsPanel.querySelector('.close-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                detailsPanel.style.display = 'none';
+                box.classList.remove('active');
+            });
+
+            gridContainer.appendChild(box);
+            gridContainer.appendChild(detailsPanel);
+        });
+
+        searchResultsDiv.appendChild(gridContainer);
+    }
 });
