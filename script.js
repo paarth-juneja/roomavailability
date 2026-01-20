@@ -47,21 +47,72 @@ document.addEventListener('DOMContentLoaded', () => {
         hourSelect.value = 11; // After 7pm, default to last hour
     }
 
-    // Load Data
-    fetch('room_availability.json')
-        .then(response => response.json())
-        .then(data => {
-            roomData = data;
-            // findAvailableRooms(); // Initial load removed as per user request
-        })
-        .catch(err => {
-            console.error('Error loading data:', err);
-            resultsDiv.innerHTML = '<p>Error loading room data. Please ensure room_availability.json exists.</p>';
-        });
+    // Configuration
+    const CACHE_VERSION = 'v1';
+    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+    // Optimization: Cache & Parallel Loading
+    async function fetchWithCache(url, key) {
+        const cacheKey = `${key}_${CACHE_VERSION}`;
+        const timestampKey = `${key}_ts`;
+
+        const cached = localStorage.getItem(cacheKey);
+        const timestamp = localStorage.getItem(timestampKey);
+        const now = Date.now();
+
+        if (cached && timestamp && (now - parseInt(timestamp) < CACHE_TTL)) {
+            try {
+                return JSON.parse(cached);
+            } catch (e) {
+                console.warn('Cache parse error', e);
+            }
+        }
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Failed to load ${url}`);
+            const data = await response.json();
+
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(data));
+                localStorage.setItem(timestampKey, now.toString());
+            } catch (e) {
+                console.warn('Cache write failed (likely quota exceeded)', e);
+            }
+            return data;
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
+    }
+
+    // Parallel Loading
+    Promise.all([
+        fetchWithCache('room_availability.json', 'roomData'),
+        fetchWithCache('courses.json', 'coursesData')
+    ]).then(([rooms, courses]) => {
+        if (rooms) {
+            roomData = rooms;
+            // findAvailableRooms(); // Disabled auto-search
+        } else {
+            resultsDiv.innerHTML = '<p>Error loading room data.</p>';
+        }
+
+        if (courses) {
+            coursesData = courses;
+        } else {
+            console.error('Error loading courses data');
+        }
+    });
 
     findBtn.addEventListener('click', findAvailableRooms);
 
     function findAvailableRooms() {
+        if (!roomData || Object.keys(roomData).length === 0) {
+            resultsDiv.innerHTML = '<p>Data loading...</p>';
+            return;
+        }
+
         const selectedBuilding = buildingSelect.value;
         const selectedDay = daySelect.value;
         const selectedHour = parseInt(hourSelect.value);
@@ -89,12 +140,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Building name mapping based on first digit
+        const buildingNames = {
+            '1': 'FD 1',
+            '2': 'FD 2',
+            '3': 'FD 3',
+            '5': 'LTC',
+            '6': 'NAB'
+        };
+
         availableRooms.sort().forEach(room => {
+            const firstDigit = room.charAt(0);
+            const buildingName = buildingNames[firstDigit] || 'Unknown';
             const card = document.createElement('div');
             card.className = 'room-card';
             card.innerHTML = `
                 <div class="room-number">${room}</div>
-                <div class="status">Available</div>
+                <div class="status">${buildingName}</div>
             `;
             resultsDiv.appendChild(card);
         });
@@ -105,24 +167,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const searchResultsDiv = document.getElementById('searchResults');
 
-    let coursesData = [];
+    let coursesData = []; // Initialized empty, filled by Promise.all
 
-    // Load courses data
-    fetch('courses.json')
-        .then(response => response.json())
-        .then(data => {
-            coursesData = data;
-        })
-        .catch(err => {
-            console.error('Error loading courses:', err);
-        });
-
+    // Event Listeners for Search
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') performSearch();
     });
 
     function performSearch() {
+        if (!coursesData || coursesData.length === 0) {
+            searchResultsDiv.innerHTML = '<p>Loading course data...</p>';
+            return;
+        }
+
         const query = searchInput.value.trim().toLowerCase();
         if (!query) {
             searchResultsDiv.innerHTML = '<p>Please enter a search term.</p>';

@@ -42,14 +42,32 @@ header h1 {
 }
 
 .controls {
-    background-color: var(--card-bg);
-    padding: 20px;
-    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(129, 140, 248, 0.1));
+    padding: 25px;
+    border-radius: 16px;
+    /* display: flex; removed to allow block layout for title/subtitle */
+    margin-bottom: 30px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.controls-row {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
+    width: 100%;
     align-items: flex-end;
-    margin-bottom: 30px;
+}
+
+.controls::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(to right, var(--accent), #818cf8);
 }
 
 .control-group {
