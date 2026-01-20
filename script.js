@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(data => {
             roomData = data;
-            findAvailableRooms(); // Initial load
+            // findAvailableRooms(); // Initial load removed as per user request
         })
         .catch(err => {
             console.error('Error loading data:', err);
