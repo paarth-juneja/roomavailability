@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Availability Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Room Availability</h1>
+            <p>Find empty classrooms instantly.</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="building">Building</label>
+                    <select id="building">
+                        <option value="all">All Buildings</option>
+                        <option value="1">FD 1</option>
+                        <option value="2">FD 2</option>
+                        <option value="3">FD 3</option>
+                        <option value="5">LTC</option>
+                        <option value="6">NAB</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="day">Day</label>
+                    <select id="day">
+                        <option value="M">Monday</option>
+                        <option value="T">Tuesday</option>
+                        <option value="W">Wednesday</option>
+                        <option value="Th">Thursday</option>
+                        <option value="F">Friday</option>
+                        <option value="S">Saturday</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="hour">Hour (1 = 8 AM)</label>
+                    <select id="hour">
+                        <!-- Filled by JS -->
+                    </select>
+                </div>
+
+                <button id="findBtn">Find Available Rooms</button>
+            </div>
+
+            <div id="results" class="results-grid">
+                <!-- Results go here -->
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

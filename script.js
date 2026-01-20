@@ -1,0 +1,102 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const buildingSelect = document.getElementById('building');
+    const daySelect = document.getElementById('day');
+    const hourSelect = document.getElementById('hour');
+    const findBtn = document.getElementById('findBtn');
+    const resultsDiv = document.getElementById('results');
+
+    let roomData = {};
+
+    // Helper function for 12-hour format
+    function formatHour(hour24) {
+        const suffix = hour24 >= 12 ? 'PM' : 'AM';
+        const hour12 = hour24 % 12 || 12;
+        return `${hour12} ${suffix}`;
+    }
+
+    // Populate hours (1 to 11, where 1=8am, 11=6pm)
+    // Hour 1: 8-9 AM, Hour 2: 9-10 AM, ..., Hour 11: 6-7 PM
+    for (let i = 1; i <= 11; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        const startHour24 = 7 + i; // i=1 -> 8, i=11 -> 18
+        const endHour24 = startHour24 + 1;
+        option.textContent = `Hour ${i} (${formatHour(startHour24)} - ${formatHour(endHour24)})`;
+        hourSelect.appendChild(option);
+    }
+
+    // Set default day to today
+    const days = ['Su', 'M', 'T', 'W', 'Th', 'F', 'S'];
+    const today = new Date().getDay();
+    if (today > 0 && today < 7) {
+        daySelect.value = days[today];
+    } else {
+        daySelect.value = 'M'; // Sunday default to Monday
+    }
+
+    // Set default hour to current time
+    const currentHour = new Date().getHours();
+    // 8am = hour 1, 6pm = hour 11
+    // If current time is 8:30, we're in hour 1 (8-9 slot)
+    if (currentHour >= 8 && currentHour <= 18) {
+        const h = currentHour - 7;
+        hourSelect.value = h;
+    } else if (currentHour < 8) {
+        hourSelect.value = 1; // Before 8am, default to first hour
+    } else {
+        hourSelect.value = 11; // After 7pm, default to last hour
+    }
+
+    // Load Data
+    fetch('room_availability.json')
+        .then(response => response.json())
+        .then(data => {
+            roomData = data;
+            findAvailableRooms(); // Initial load
+        })
+        .catch(err => {
+            console.error('Error loading data:', err);
+            resultsDiv.innerHTML = '<p>Error loading room data. Please ensure room_availability.json exists.</p>';
+        });
+
+    findBtn.addEventListener('click', findAvailableRooms);
+
+    function findAvailableRooms() {
+        const selectedBuilding = buildingSelect.value;
+        const selectedDay = daySelect.value;
+        const selectedHour = parseInt(hourSelect.value);
+
+        resultsDiv.innerHTML = '';
+
+        let availableRooms = [];
+
+        for (const [room, schedule] of Object.entries(roomData)) {
+            // Filter by building
+            if (selectedBuilding !== 'all') {
+                const firstDigit = room.charAt(0);
+                if (firstDigit !== selectedBuilding) continue;
+            }
+
+            // Check availability
+            const busyHours = schedule[selectedDay] || [];
+            if (!busyHours.includes(selectedHour)) {
+                availableRooms.push(room);
+            }
+        }
+
+        if (availableRooms.length === 0) {
+            resultsDiv.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">No rooms available.</p>';
+            return;
+        }
+
+        availableRooms.sort().forEach(room => {
+            const card = document.createElement('div');
+            card.className = 'room-card';
+            card.innerHTML = `
+                <div class="room-number">${room}</div>
+                <div class="status">Available</div>
+            `;
+            resultsDiv.appendChild(card);
+        });
+    }
+});
